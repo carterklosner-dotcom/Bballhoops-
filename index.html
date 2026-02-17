@@ -3,9 +3,39 @@
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Retro Hoops 5v5</title>
+
 <style>
-body { margin:0; overflow:hidden; background:#c28c4e; touch-action:none; }
-canvas { display:block; }
+body {
+  margin:0;
+  background:black;
+  overflow:hidden;
+  touch-action:none;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+}
+
+#rotateMessage {
+  position:absolute;
+  color:white;
+  font-size:24px;
+  text-align:center;
+}
+
+#gameContainer {
+  display:none;
+  position:relative;
+  width:100vw;
+  height:56.25vw; /* 16:9 ratio */
+  max-height:100vh;
+  max-width:177.78vh;
+}
+
+canvas {
+  width:100%;
+  height:100%;
+  background:#d8a45b;
+}
 
 .button {
   position:absolute;
@@ -36,67 +66,74 @@ canvas { display:block; }
 </head>
 <body>
 
-<canvas id="game"></canvas>
+<div id="rotateMessage">Rotate Your Phone 📱➡️</div>
 
-<div id="joystickBase"></div>
+<div id="gameContainer">
+  <canvas id="game"></canvas>
+  <div id="joystickBase"></div>
 
-<button id="passBtn" class="button">PASS</button>
-<button id="shootBtn" class="button">SHOOT</button>
-<button id="stealBtn" class="button">STEAL</button>
-<button id="blockBtn" class="button">BLOCK</button>
+  <button id="passBtn" class="button">PASS</button>
+  <button id="shootBtn" class="button">SHOOT</button>
+  <button id="stealBtn" class="button">STEAL</button>
+  <button id="blockBtn" class="button">BLOCK</button>
+</div>
 
 <script>
+const rotateMessage = document.getElementById("rotateMessage");
+const gameContainer = document.getElementById("gameContainer");
+
+function checkOrientation(){
+  if(window.innerWidth > window.innerHeight){
+    rotateMessage.style.display="none";
+    gameContainer.style.display="block";
+  } else {
+    rotateMessage.style.display="block";
+    gameContainer.style.display="none";
+  }
+}
+checkOrientation();
+window.addEventListener("resize",checkOrientation);
+
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
-function resize(){
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
+function resizeCanvas(){
+  canvas.width = canvas.offsetWidth;
+  canvas.height = canvas.offsetHeight;
 }
-resize();
-window.addEventListener("resize", resize);
+resizeCanvas();
+window.addEventListener("resize",resizeCanvas);
 
-let possession = "offense";
-let currentPlayer = 0;
-let score = 0;
-let gameTime = 240;
+let possession="offense";
+let currentPlayer=0;
+let score=0;
+let speed=3;
 
-let speed = 3;
+let players=[];
+let defenders=[];
 
-let players = [];
-let defenders = [];
-
-// Create 5v5
 for(let i=0;i<5;i++){
-  players.push({x:150,y:150+i*100,color:"blue",shoot:70+Math.random()*20});
-  defenders.push({x:canvas.width-200,y:150+i*100,color:"red"});
+  players.push({x:150,y:150+i*80,color:"blue",shoot:70+Math.random()*20});
+  defenders.push({x:canvas.width-200,y:150+i*80,color:"red"});
 }
 
-let keys = {x:0,y:0};
+let keys={x:0,y:0};
 
-canvas.addEventListener("touchmove", e=>{
-  let t = e.touches[0];
-  keys.x = (t.clientX - players[currentPlayer].x) * 0.01;
-  keys.y = (t.clientY - players[currentPlayer].y) * 0.01;
+canvas.addEventListener("touchmove",e=>{
+  let t=e.touches[0];
+  keys.x=(t.clientX-players[currentPlayer].x)*0.01;
+  keys.y=(t.clientY-players[currentPlayer].y)*0.01;
 });
 
 function drawCourt(){
   ctx.fillStyle="#d8a45b";
   ctx.fillRect(0,0,canvas.width,canvas.height);
-  ctx.strokeStyle="white";
-  ctx.lineWidth=4;
-  ctx.strokeRect(0,0,canvas.width,canvas.height);
-  ctx.beginPath();
-  ctx.arc(canvas.width-100,canvas.height/2,60,0,Math.PI*2);
-  ctx.stroke();
 }
 
-function drawPlayer(p, index, isOffense){
+function drawPlayer(p,i,isOffense){
   ctx.fillStyle=p.color;
   ctx.fillRect(p.x,p.y,25,25);
-
-  // Highlight controlled player
-  if(isOffense && index===currentPlayer){
+  if(isOffense && i===currentPlayer){
     ctx.strokeStyle="yellow";
     ctx.strokeRect(p.x,p.y,25,25);
   }
@@ -104,14 +141,13 @@ function drawPlayer(p, index, isOffense){
 
 function updateAI(){
   defenders.forEach((def,i)=>{
-    let target = players[i]; // man-to-man
-    let dx = target.x - def.x;
-    let dy = target.y - def.y;
-    let dist = Math.sqrt(dx*dx+dy*dy);
-
-    if(dist > 5){
-      def.x += dx/dist * 2;
-      def.y += dy/dist * 2;
+    let target=players[i];
+    let dx=target.x-def.x;
+    let dy=target.y-def.y;
+    let dist=Math.sqrt(dx*dx+dy*dy);
+    if(dist>5){
+      def.x+=dx/dist*2;
+      def.y+=dy/dist*2;
     }
   });
 }
@@ -121,11 +157,8 @@ function update(){
   drawCourt();
 
   if(possession==="offense"){
-    players[currentPlayer].x += keys.x * speed;
-    players[currentPlayer].y += keys.y * speed;
-  } else {
-    defenders[currentPlayer].x += keys.x * speed;
-    defenders[currentPlayer].y += keys.y * speed;
+    players[currentPlayer].x+=keys.x*speed;
+    players[currentPlayer].y+=keys.y*speed;
   }
 
   updateAI();
@@ -136,7 +169,6 @@ function update(){
   ctx.fillStyle="black";
   ctx.font="20px Arial";
   ctx.fillText("Score: "+score,20,30);
-  ctx.fillText("Time: "+Math.floor(gameTime),20,60);
 
   requestAnimationFrame(update);
 }
@@ -168,42 +200,6 @@ shootBtn.onclick=()=>{
     alert("Missed!");
   }
 };
-
-// STEAL
-stealBtn.onclick=()=>{
-  let def=defenders[currentPlayer];
-  let ballHandler=players[currentPlayer];
-  let dx=def.x-ballHandler.x;
-  let dy=def.y-ballHandler.y;
-  let d=Math.sqrt(dx*dx+dy*dy);
-
-  if(d<50 && Math.random()<0.4){
-    possession="offense";
-    alert("Steal!");
-  }
-};
-
-// BLOCK
-blockBtn.onclick=()=>{
-  alert("Block Attempt!");
-};
-
-// Toggle possession tap
-canvas.addEventListener("dblclick",()=>{
-  if(possession==="offense"){
-    possession="defense";
-    passBtn.style.display="none";
-    shootBtn.style.display="none";
-    stealBtn.style.display="block";
-    blockBtn.style.display="block";
-  } else {
-    possession="offense";
-    passBtn.style.display="block";
-    shootBtn.style.display="block";
-    stealBtn.style.display="none";
-    blockBtn.style.display="none";
-  }
-});
 </script>
 
 </body>
