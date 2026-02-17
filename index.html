@@ -2,18 +2,10 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Retro Hoops</title>
+<title>Retro Hoops 5v5</title>
 <style>
-body {
-  margin:0;
-  overflow:hidden;
-  background:#c28c4e;
-  touch-action:none;
-}
-
-canvas {
-  display:block;
-}
+body { margin:0; overflow:hidden; background:#c28c4e; touch-action:none; }
+canvas { display:block; }
 
 .button {
   position:absolute;
@@ -23,7 +15,6 @@ canvas {
   border:none;
   font-weight:bold;
   color:white;
-  font-size:14px;
 }
 
 #passBtn { right:30px; bottom:100px; background:#1e90ff; }
@@ -51,7 +42,6 @@ canvas {
 
 <button id="passBtn" class="button">PASS</button>
 <button id="shootBtn" class="button">SHOOT</button>
-
 <button id="stealBtn" class="button">STEAL</button>
 <button id="blockBtn" class="button">BLOCK</button>
 
@@ -59,7 +49,7 @@ canvas {
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
-function resize() {
+function resize(){
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
 }
@@ -67,60 +57,82 @@ resize();
 window.addEventListener("resize", resize);
 
 let possession = "offense";
-let score = 0;
-let gameTime = 120; // seconds
-
 let currentPlayer = 0;
+let score = 0;
+let gameTime = 240;
+
 let speed = 3;
 
-let players = [
-  {x:200,y:300,color:"blue",shoot:80},
-  {x:200,y:200,color:"blue",shoot:75},
-  {x:200,y:400,color:"blue",shoot:70}
-];
+let players = [];
+let defenders = [];
 
-let defenders = [
-  {x:600,y:300,color:"red"},
-  {x:600,y:200,color:"red"},
-  {x:600,y:400,color:"red"}
-];
-
-let ball = {owner:0};
+// Create 5v5
+for(let i=0;i<5;i++){
+  players.push({x:150,y:150+i*100,color:"blue",shoot:70+Math.random()*20});
+  defenders.push({x:canvas.width-200,y:150+i*100,color:"red"});
+}
 
 let keys = {x:0,y:0};
 
 canvas.addEventListener("touchmove", e=>{
-  let touch = e.touches[0];
-  keys.x = (touch.clientX - players[currentPlayer].x) * 0.01;
-  keys.y = (touch.clientY - players[currentPlayer].y) * 0.01;
+  let t = e.touches[0];
+  keys.x = (t.clientX - players[currentPlayer].x) * 0.01;
+  keys.y = (t.clientY - players[currentPlayer].y) * 0.01;
 });
 
 function drawCourt(){
   ctx.fillStyle="#d8a45b";
   ctx.fillRect(0,0,canvas.width,canvas.height);
-
   ctx.strokeStyle="white";
   ctx.lineWidth=4;
   ctx.strokeRect(0,0,canvas.width,canvas.height);
+  ctx.beginPath();
+  ctx.arc(canvas.width-100,canvas.height/2,60,0,Math.PI*2);
+  ctx.stroke();
 }
 
-function drawPlayer(p){
+function drawPlayer(p, index, isOffense){
   ctx.fillStyle=p.color;
   ctx.fillRect(p.x,p.y,25,25);
+
+  // Highlight controlled player
+  if(isOffense && index===currentPlayer){
+    ctx.strokeStyle="yellow";
+    ctx.strokeRect(p.x,p.y,25,25);
+  }
+}
+
+function updateAI(){
+  defenders.forEach((def,i)=>{
+    let target = players[i]; // man-to-man
+    let dx = target.x - def.x;
+    let dy = target.y - def.y;
+    let dist = Math.sqrt(dx*dx+dy*dy);
+
+    if(dist > 5){
+      def.x += dx/dist * 2;
+      def.y += dy/dist * 2;
+    }
+  });
 }
 
 function update(){
   ctx.clearRect(0,0,canvas.width,canvas.height);
   drawCourt();
 
-  // Move player
-  players[currentPlayer].x += keys.x * speed;
-  players[currentPlayer].y += keys.y * speed;
+  if(possession==="offense"){
+    players[currentPlayer].x += keys.x * speed;
+    players[currentPlayer].y += keys.y * speed;
+  } else {
+    defenders[currentPlayer].x += keys.x * speed;
+    defenders[currentPlayer].y += keys.y * speed;
+  }
 
-  players.forEach(drawPlayer);
-  defenders.forEach(drawPlayer);
+  updateAI();
 
-  // Score display
+  players.forEach((p,i)=>drawPlayer(p,i,true));
+  defenders.forEach((d,i)=>drawPlayer(d,i,false));
+
   ctx.fillStyle="black";
   ctx.font="20px Arial";
   ctx.fillText("Score: "+score,20,30);
@@ -128,21 +140,28 @@ function update(){
 
   requestAnimationFrame(update);
 }
-
 update();
 
 // PASS
-document.getElementById("passBtn").onclick=()=>{
-  currentPlayer = (currentPlayer+1)%players.length;
+passBtn.onclick=()=>{
+  currentPlayer=(currentPlayer+1)%5;
 };
 
 // SHOOT
-document.getElementById("shootBtn").onclick=()=>{
-  let shooter = players[currentPlayer];
-  let distance = canvas.width - shooter.x;
-  let chance = shooter.shoot - distance*0.05;
+shootBtn.onclick=()=>{
+  let shooter=players[currentPlayer];
+  let distance=canvas.width-shooter.x;
+  let contest=0;
 
-  if(Math.random()*100 < chance){
+  defenders.forEach(def=>{
+    let dx=def.x-shooter.x;
+    let dy=def.y-shooter.y;
+    let d=Math.sqrt(dx*dx+dy*dy);
+    if(d<80) contest+=20;
+  });
+
+  let chance=shooter.shoot-distance*0.05-contest;
+  if(Math.random()*100<chance){
     score+=2;
     alert("Bucket!");
   } else {
@@ -151,17 +170,26 @@ document.getElementById("shootBtn").onclick=()=>{
 };
 
 // STEAL
-document.getElementById("stealBtn").onclick=()=>{
-  alert("Steal attempt!");
+stealBtn.onclick=()=>{
+  let def=defenders[currentPlayer];
+  let ballHandler=players[currentPlayer];
+  let dx=def.x-ballHandler.x;
+  let dy=def.y-ballHandler.y;
+  let d=Math.sqrt(dx*dx+dy*dy);
+
+  if(d<50 && Math.random()<0.4){
+    possession="offense";
+    alert("Steal!");
+  }
 };
 
 // BLOCK
-document.getElementById("blockBtn").onclick=()=>{
-  alert("Block attempt!");
+blockBtn.onclick=()=>{
+  alert("Block Attempt!");
 };
 
-// Toggle possession (tap top area)
-canvas.addEventListener("dblclick", ()=>{
+// Toggle possession tap
+canvas.addEventListener("dblclick",()=>{
   if(possession==="offense"){
     possession="defense";
     passBtn.style.display="none";
