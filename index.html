@@ -1,38 +1,43 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Retro Hoops</title>
 <style>
 body {
-  margin: 0;
-  background: #1e7f2d;
-  overflow: hidden;
-  touch-action: none;
+  margin:0;
+  overflow:hidden;
+  background:#c28c4e;
+  touch-action:none;
 }
+
 canvas {
-  background: #2fa34a;
-  display: block;
+  display:block;
 }
+
 .button {
-  position: absolute;
-  width: 70px;
-  height: 70px;
-  border-radius: 50%;
-  border: none;
-  font-size: 14px;
-  color: white;
-}
-#passBtn { background: blue; bottom: 80px; right: 20px; }
-#shootBtn { background: red; bottom: 160px; right: 20px; }
-#stealBtn { background: purple; bottom: 80px; right: 20px; display:none;}
-#blockBtn { background: orange; bottom: 160px; right: 20px; display:none;}
-#joystick {
   position:absolute;
-  bottom:80px;
-  left:20px;
-  width:100px;
-  height:100px;
+  width:80px;
+  height:80px;
+  border-radius:50%;
+  border:none;
+  font-weight:bold;
+  color:white;
+  font-size:14px;
+}
+
+#passBtn { right:30px; bottom:100px; background:#1e90ff; }
+#shootBtn { right:30px; bottom:200px; background:#ff3b30; }
+
+#stealBtn { right:30px; bottom:100px; background:#9b59b6; display:none; }
+#blockBtn { right:30px; bottom:200px; background:#f39c12; display:none; }
+
+#joystickBase {
+  position:absolute;
+  left:40px;
+  bottom:120px;
+  width:120px;
+  height:120px;
   border-radius:50%;
   background:rgba(255,255,255,0.2);
 }
@@ -42,7 +47,7 @@ canvas {
 
 <canvas id="game"></canvas>
 
-<div id="joystick"></div>
+<div id="joystickBase"></div>
 
 <button id="passBtn" class="button">PASS</button>
 <button id="shootBtn" class="button">SHOOT</button>
@@ -54,36 +59,72 @@ canvas {
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
+function resize() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener("resize", resize);
 
 let possession = "offense";
-
-let players = [
-  {x:200,y:300,color:"blue"},
-  {x:300,y:350,color:"blue"},
-  {x:400,y:320,color:"blue"}
-];
-
-let enemies = [
-  {x:600,y:300,color:"red"},
-  {x:650,y:350,color:"red"},
-  {x:700,y:320,color:"red"}
-];
+let score = 0;
+let gameTime = 120; // seconds
 
 let currentPlayer = 0;
-let speed = 4;
+let speed = 3;
+
+let players = [
+  {x:200,y:300,color:"blue",shoot:80},
+  {x:200,y:200,color:"blue",shoot:75},
+  {x:200,y:400,color:"blue",shoot:70}
+];
+
+let defenders = [
+  {x:600,y:300,color:"red"},
+  {x:600,y:200,color:"red"},
+  {x:600,y:400,color:"red"}
+];
+
+let ball = {owner:0};
+
+let keys = {x:0,y:0};
+
+canvas.addEventListener("touchmove", e=>{
+  let touch = e.touches[0];
+  keys.x = (touch.clientX - players[currentPlayer].x) * 0.01;
+  keys.y = (touch.clientY - players[currentPlayer].y) * 0.01;
+});
+
+function drawCourt(){
+  ctx.fillStyle="#d8a45b";
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  ctx.strokeStyle="white";
+  ctx.lineWidth=4;
+  ctx.strokeRect(0,0,canvas.width,canvas.height);
+}
 
 function drawPlayer(p){
-  ctx.fillStyle = p.color;
-  ctx.fillRect(p.x, p.y, 20, 20);
+  ctx.fillStyle=p.color;
+  ctx.fillRect(p.x,p.y,25,25);
 }
 
 function update(){
   ctx.clearRect(0,0,canvas.width,canvas.height);
-  
+  drawCourt();
+
+  // Move player
+  players[currentPlayer].x += keys.x * speed;
+  players[currentPlayer].y += keys.y * speed;
+
   players.forEach(drawPlayer);
-  enemies.forEach(drawPlayer);
+  defenders.forEach(drawPlayer);
+
+  // Score display
+  ctx.fillStyle="black";
+  ctx.font="20px Arial";
+  ctx.fillText("Score: "+score,20,30);
+  ctx.fillText("Time: "+Math.floor(gameTime),20,60);
 
   requestAnimationFrame(update);
 }
@@ -91,41 +132,51 @@ function update(){
 update();
 
 // PASS
-document.getElementById("passBtn").onclick = function(){
-  currentPlayer = (currentPlayer + 1) % players.length;
+document.getElementById("passBtn").onclick=()=>{
+  currentPlayer = (currentPlayer+1)%players.length;
 };
 
 // SHOOT
-document.getElementById("shootBtn").onclick = function(){
-  alert("Shot Attempt!");
+document.getElementById("shootBtn").onclick=()=>{
+  let shooter = players[currentPlayer];
+  let distance = canvas.width - shooter.x;
+  let chance = shooter.shoot - distance*0.05;
+
+  if(Math.random()*100 < chance){
+    score+=2;
+    alert("Bucket!");
+  } else {
+    alert("Missed!");
+  }
 };
 
 // STEAL
-document.getElementById("stealBtn").onclick = function(){
-  alert("Steal Attempt!");
+document.getElementById("stealBtn").onclick=()=>{
+  alert("Steal attempt!");
 };
 
 // BLOCK
-document.getElementById("blockBtn").onclick = function(){
-  alert("Block Attempt!");
+document.getElementById("blockBtn").onclick=()=>{
+  alert("Block attempt!");
 };
 
-// SWITCH POSSESSION (Demo toggle)
+// Toggle possession (tap top area)
 canvas.addEventListener("dblclick", ()=>{
-  if(possession === "offense"){
-    possession = "defense";
-    document.getElementById("passBtn").style.display="none";
-    document.getElementById("shootBtn").style.display="none";
-    document.getElementById("stealBtn").style.display="block";
-    document.getElementById("blockBtn").style.display="block";
+  if(possession==="offense"){
+    possession="defense";
+    passBtn.style.display="none";
+    shootBtn.style.display="none";
+    stealBtn.style.display="block";
+    blockBtn.style.display="block";
   } else {
-    possession = "offense";
-    document.getElementById("passBtn").style.display="block";
-    document.getElementById("shootBtn").style.display="block";
-    document.getElementById("stealBtn").style.display="none";
-    document.getElementById("blockBtn").style.display="none";
+    possession="offense";
+    passBtn.style.display="block";
+    shootBtn.style.display="block";
+    stealBtn.style.display="none";
+    blockBtn.style.display="none";
   }
 });
 </script>
+
 </body>
 </html>
