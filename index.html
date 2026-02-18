@@ -1,33 +1,64 @@
 <!DOCTYPE html>
 <html>
 <head>
-<head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Retro Hoops</title>
 
 <style>
-html, body {
+body {
     margin: 0;
-    padding: 0;
-    overflow: hidden;
     background: #111;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    overflow: hidden;
+}
+
+#gameContainer {
+    position: relative;
 }
 
 canvas {
+    background: #d68b30;
     display: block;
 }
+
+#controls {
+    position: absolute;
+    bottom: 15px;
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    padding: 0 30px;
+}
+
+.btn {
+    width: 65px;
+    height: 65px;
+    border-radius: 50%;
+    text-align: center;
+    line-height: 65px;
+    font-weight: bold;
+    color: white;
+}
+
+#shoot { background: red; }
+#pass { background: blue; }
+#steal { background: green; }
 </style>
-</head>
 </head>
 <body>
 
-<canvas id="game"></canvas>
+<div id="gameContainer">
+    <canvas id="game"></canvas>
 
-<div id="controls">
-    <div id="steal" class="btn">STEAL</div>
-    <div style="display:flex; gap:20px;">
-        <div id="pass" class="btn">PASS</div>
-        <div id="shoot" class="btn">SHOOT</div>
+    <div id="controls">
+        <div id="steal" class="btn">STEAL</div>
+        <div style="display:flex; gap:20px;">
+            <div id="pass" class="btn">PASS</div>
+            <div id="shoot" class="btn">SHOOT</div>
+        </div>
     </div>
 </div>
 
@@ -35,17 +66,9 @@ canvas {
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
-function resizeGame() {
-    if (window.innerWidth < window.innerHeight) {
-        canvas.width = window.innerHeight;
-        canvas.height = window.innerWidth;
-    } else {
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
-    }
-}
-resizeGame();
-window.addEventListener("resize", resizeGame);
+// LOCKED LANDSCAPE SIZE
+canvas.width = 900;
+canvas.height = 500;
 
 let players = [];
 let userPlayer = null;
@@ -57,7 +80,7 @@ class Player {
         this.x = x;
         this.y = y;
         this.team = team;
-        this.radius = 15;
+        this.radius = 14;
         this.hasBall = false;
     }
 
@@ -74,16 +97,16 @@ class Player {
         let dist = Math.sqrt(dx*dx + dy*dy);
 
         if (dist > 1) {
-            this.x += dx / dist * 2;
-            this.y += dy / dist * 2;
+            this.x += dx / dist * 3;
+            this.y += dy / dist * 3;
         }
     }
 }
 
 function createTeams() {
     for (let i = 0; i < 5; i++) {
-        players.push(new Player(100, 150 + i*80, "home"));
-        players.push(new Player(canvas.width - 100, 150 + i*80, "away"));
+        players.push(new Player(150, 100 + i*70, "home"));
+        players.push(new Player(750, 100 + i*70, "away"));
     }
 
     userPlayer = players[0];
@@ -96,6 +119,7 @@ function drawCourt() {
     ctx.fillRect(0,0,canvas.width,canvas.height);
 
     ctx.strokeStyle = "white";
+    ctx.lineWidth = 4;
     ctx.beginPath();
     ctx.moveTo(canvas.width/2, 0);
     ctx.lineTo(canvas.width/2, canvas.height);
@@ -119,7 +143,7 @@ function update() {
 
     ctx.beginPath();
     ctx.fillStyle = "orange";
-    ctx.arc(ball.x, ball.y, 8, 0, Math.PI * 2);
+    ctx.arc(ball.x, ball.y, 7, 0, Math.PI * 2);
     ctx.fill();
 
     ctx.fillStyle = "white";
@@ -130,8 +154,11 @@ function update() {
 }
 
 canvas.addEventListener("touchmove", function(e){
+    let rect = canvas.getBoundingClientRect();
     let touch = e.touches[0];
-    userPlayer.moveToward(touch.clientX, touch.clientY);
+    let x = touch.clientX - rect.left;
+    let y = touch.clientY - rect.top;
+    userPlayer.moveToward(x, y);
 });
 
 document.getElementById("pass").ontouchstart = function() {
