@@ -1,222 +1,177 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>Retro Hoops 5v5</title>
-
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Retro Hoops</title>
 <style>
-body{
-  margin:0;
-  overflow:hidden;
-  background:#d8a45b;
-  touch-action:none;
+body {
+    margin: 0;
+    background: #111;
+    overflow: hidden;
+    touch-action: none;
 }
 
-canvas{
-  display:block;
+canvas {
+    background: #d68b30;
+    display: block;
 }
 
-.button{
-  position:absolute;
-  width:70px;
-  height:70px;
-  border-radius:50%;
-  border:none;
-  font-weight:bold;
-  color:white;
+#controls {
+    position: fixed;
+    bottom: 20px;
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    padding: 0 20px;
 }
 
-#passBtn{ right:20px; bottom:100px; background:#1e90ff; }
-#shootBtn{ right:20px; bottom:180px; background:#ff3b30; }
+.btn {
+    width: 70px;
+    height: 70px;
+    background: white;
+    border-radius: 50%;
+    font-size: 16px;
+    text-align: center;
+    line-height: 70px;
+    user-select: none;
+}
 
-#stealBtn{ right:20px; bottom:100px; background:#9b59b6; display:none; }
-#blockBtn{ right:20px; bottom:180px; background:#f39c12; display:none; }
+#shoot { background: red; color: white; }
+#pass { background: blue; color: white; }
+#steal { background: green; color: white; }
 </style>
 </head>
 <body>
 
 <canvas id="game"></canvas>
 
-<button id="passBtn" class="button">PASS</button>
-<button id="shootBtn" class="button">SHOOT</button>
-<button id="stealBtn" class="button">STEAL</button>
-<button id="blockBtn" class="button">BLOCK</button>
+<div id="controls">
+    <div id="steal" class="btn">STEAL</div>
+    <div style="display:flex; gap:20px;">
+        <div id="pass" class="btn">PASS</div>
+        <div id="shoot" class="btn">SHOOT</div>
+    </div>
+</div>
 
 <script>
-  <script>
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
-function resizeCanvas(){
-  canvas.width = canvas.offsetWidth;
-  canvas.height = canvas.offsetHeight;
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+let players = [];
+let userPlayer = null;
+let ball = { x: 0, y: 0, holder: null };
+let score = 0;
+
+class Player {
+    constructor(x, y, team) {
+        this.x = x;
+        this.y = y;
+        this.team = team;
+        this.radius = 15;
+        this.hasBall = false;
+    }
+
+    draw() {
+        ctx.beginPath();
+        ctx.fillStyle = this.team === "home" ? "white" : "black";
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    moveToward(tx, ty) {
+        let dx = tx - this.x;
+        let dy = ty - this.y;
+        let dist = Math.sqrt(dx*dx + dy*dy);
+
+        if (dist > 1) {
+            this.x += dx / dist * 2;
+            this.y += dy / dist * 2;
+        }
+    }
 }
-resizeCanvas();
-window.addEventListener("resize",resizeCanvas);
 
-let possession="offense";
-let currentPlayer=0;
-let score=0;
-let speed=3;
+function createTeams() {
+    for (let i = 0; i < 5; i++) {
+        players.push(new Player(100, 150 + i*80, "home"));
+        players.push(new Player(canvas.width - 100, 150 + i*80, "away"));
+    }
 
-let players=[];
-let defenders=[];
-
-for(let i=0;i<5;i++){
-  players.push({x:150,y:120+i*80,color:"blue",shoot:70+Math.random()*20});
-  defenders.push({x:canvas.width-200,y:120+i*80,color:"red"});
+    userPlayer = players[0];
+    userPlayer.hasBall = true;
+    ball.holder = userPlayer;
 }
 
-let keys={x:0,y:0};
+function drawCourt() {
+    ctx.fillStyle = "#d68b30";
+    ctx.fillRect(0,0,canvas.width,canvas.height);
 
-canvas.addEventListener("touchmove",e=>{
-  let t=e.touches[0];
-  let controlled = possession==="offense" ? players[currentPlayer] : defenders[currentPlayer];
-  keys.x=(t.clientX-controlled.x)*0.01;
-  keys.y=(t.clientY-controlled.y)*0.01;
+    ctx.strokeStyle = "white";
+    ctx.beginPath();
+    ctx.moveTo(canvas.width/2, 0);
+    ctx.lineTo(canvas.width/2, canvas.height);
+    ctx.stroke();
+}
+
+function update() {
+    drawCourt();
+
+    players.forEach(p => {
+        if (p.team === "away") {
+            p.moveToward(ball.holder.x, ball.holder.y);
+        }
+        p.draw();
+    });
+
+    if (ball.holder) {
+        ball.x = ball.holder.x;
+        ball.y = ball.holder.y;
+    }
+
+    ctx.beginPath();
+    ctx.fillStyle = "orange";
+    ctx.arc(ball.x, ball.y, 8, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "white";
+    ctx.font = "20px Arial";
+    ctx.fillText("Score: " + score, 20, 30);
+
+    requestAnimationFrame(update);
+}
+
+canvas.addEventListener("touchmove", function(e){
+    let touch = e.touches[0];
+    userPlayer.moveToward(touch.clientX, touch.clientY);
 });
 
-function drawCourt(){
-  ctx.fillStyle="#d8a45b";
-  ctx.fillRect(0,0,canvas.width,canvas.height);
-}
+document.getElementById("pass").ontouchstart = function() {
+    let teammates = players.filter(p => p.team === "home");
+    let next = teammates[Math.floor(Math.random()*teammates.length)];
+    userPlayer.hasBall = false;
+    next.hasBall = true;
+    userPlayer = next;
+    ball.holder = userPlayer;
+};
 
-function drawPlayer(p,i,isTeam){
-  ctx.fillStyle=p.color;
-  ctx.fillRect(p.x,p.y,25,25);
+document.getElementById("shoot").ontouchstart = function() {
+    score += 2;
+};
 
-  if(i===currentPlayer){
-    ctx.strokeStyle="yellow";
-    ctx.strokeRect(p.x,p.y,25,25);
-  }
-}
-
-function updateDefenseAI(){
-  defenders.forEach((def,i)=>{
-    if(possession==="offense"){
-      let target=players[i];
-      let dx=target.x-def.x;
-      let dy=target.y-def.y;
-      let dist=Math.sqrt(dx*dx+dy*dy);
-      if(dist>5){
-        def.x+=dx/dist*2;
-        def.y+=dy/dist*2;
-      }
-    }
-  });
-}
-
-function updateOffenseAI(){
-  if(possession==="defense"){
-    players.forEach((pl,i)=>{
-      if(i!==currentPlayer){
-        pl.x+=Math.random()*2-1;
-        pl.y+=Math.random()*2-1;
-      }
+document.getElementById("steal").ontouchstart = function() {
+    players.forEach(p => {
+        if (p.team === "away" && p.hasBall) {
+            p.hasBall = false;
+            userPlayer.hasBall = true;
+            ball.holder = userPlayer;
+        }
     });
-  }
-}
+};
 
-function update(){
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  drawCourt();
-
-  let controlled = possession==="offense" ? players[currentPlayer] : defenders[currentPlayer];
-
-  controlled.x+=keys.x*speed;
-  controlled.y+=keys.y*speed;
-
-  updateDefenseAI();
-  updateOffenseAI();
-
-  players.forEach((p,i)=>drawPlayer(p,i,true));
-  defenders.forEach((d,i)=>drawPlayer(d,i,false));
-
-  ctx.fillStyle="black";
-  ctx.font="20px Arial";
-  ctx.fillText("Score: "+score,20,30);
-  ctx.fillText("Mode: "+possession,20,60);
-
-  requestAnimationFrame(update);
-}
+createTeams();
 update();
-
-/* OFFENSE BUTTONS */
-
-passBtn.onclick=()=>{
-  if(possession==="offense"){
-    currentPlayer=(currentPlayer+1)%5;
-  }
-};
-
-shootBtn.onclick=()=>{
-  if(possession==="offense"){
-    let shooter=players[currentPlayer];
-    let distance=canvas.width-shooter.x;
-    let contest=0;
-
-    defenders.forEach(def=>{
-      let dx=def.x-shooter.x;
-      let dy=def.y-shooter.y;
-      let d=Math.sqrt(dx*dx+dy*dy);
-      if(d<80) contest+=25;
-    });
-
-    let chance=shooter.shoot-distance*0.05-contest;
-
-    if(Math.random()*100<chance){
-      score+=2;
-      possession="defense";
-      alert("Bucket!");
-      switchToDefense();
-    } else {
-      possession="defense";
-      alert("Missed!");
-      switchToDefense();
-    }
-  }
-};
-
-/* DEFENSE BUTTONS */
-
-stealBtn.onclick=()=>{
-  if(possession==="defense"){
-    let def=defenders[currentPlayer];
-    let ballHandler=players[currentPlayer];
-    let dx=def.x-ballHandler.x;
-    let dy=def.y-ballHandler.y;
-    let d=Math.sqrt(dx*dx+dy*dy);
-
-    if(d<50 && Math.random()<0.5){
-      possession="offense";
-      alert("Steal!");
-      switchToOffense();
-    }
-  }
-};
-
-blockBtn.onclick=()=>{
-  if(possession==="defense"){
-    alert("Contest!");
-  }
-};
-
-function switchToDefense(){
-  passBtn.style.display="none";
-  shootBtn.style.display="none";
-  stealBtn.style.display="block";
-  blockBtn.style.display="block";
-  currentPlayer=0;
-}
-
-function switchToOffense(){
-  passBtn.style.display="block";
-  shootBtn.style.display="block";
-  stealBtn.style.display="none";
-  blockBtn.style.display="none";
-  currentPlayer=0;
-}
-</script>
 </script>
 
 </body>
