@@ -5,28 +5,28 @@
 <title>Retro Hoops</title>
 
 <style>
-body {
+html, body {
     margin: 0;
-    background: #111;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 100vh;
+    padding: 0;
     overflow: hidden;
+    background: #d68b30;
 }
 
 #gameContainer {
     position: relative;
+    width: 100vw;
+    height: 100vh;
 }
 
 canvas {
-    background: #d68b30;
+    width: 100vw;
+    height: 100vh;
     display: block;
 }
 
 #controls {
     position: absolute;
-    bottom: 15px;
+    bottom: 20px;
     width: 100%;
     display: flex;
     justify-content: space-between;
@@ -34,11 +34,11 @@ canvas {
 }
 
 .btn {
-    width: 65px;
-    height: 65px;
+    width: 70px;
+    height: 70px;
     border-radius: 50%;
     text-align: center;
-    line-height: 65px;
+    line-height: 70px;
     font-weight: bold;
     color: white;
 }
@@ -62,13 +62,17 @@ canvas {
     </div>
 </div>
 
-<script>
+    <script>
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
-// LOCKED LANDSCAPE SIZE
-canvas.width = 900;
-canvas.height = 500;
+        function resizeCanvas() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+}
+
+resizeCanvas();
+window.addEventListener("resize", resizeCanvas);
 
 let players = [];
 let userPlayer = null;
@@ -76,12 +80,14 @@ let ball = { x: 0, y: 0, holder: null };
 let score = 0;
 
 class Player {
-    constructor(x, y, team) {
+    constructor(x, y, team, matchupIndex) {
         this.x = x;
         this.y = y;
         this.team = team;
         this.radius = 14;
         this.hasBall = false;
+        this.matchupIndex = matchupIndex;
+        this.speed = 2.5;
     }
 
     draw() {
@@ -91,22 +97,22 @@ class Player {
         ctx.fill();
     }
 
-    moveToward(tx, ty) {
+    moveToward(tx, ty, speedMultiplier = 1) {
         let dx = tx - this.x;
         let dy = ty - this.y;
         let dist = Math.sqrt(dx*dx + dy*dy);
 
         if (dist > 1) {
-            this.x += dx / dist * 3;
-            this.y += dy / dist * 3;
+            this.x += dx / dist * this.speed * speedMultiplier;
+            this.y += dy / dist * this.speed * speedMultiplier;
         }
     }
 }
 
 function createTeams() {
     for (let i = 0; i < 5; i++) {
-        players.push(new Player(150, 100 + i*70, "home"));
-        players.push(new Player(750, 100 + i*70, "away"));
+        players.push(new Player(150, 100 + i*70, "home", i));
+        players.push(new Player(750, 100 + i*70, "away", i));
     }
 
     userPlayer = players[0];
@@ -126,15 +132,39 @@ function drawCourt() {
     ctx.stroke();
 }
 
-function update() {
-    drawCourt();
+function distance(a, b) {
+    return Math.sqrt((a.x - b.x)**2 + (a.y - b.y)**2);
+}
 
+function updateDefense() {
     players.forEach(p => {
         if (p.team === "away") {
-            p.moveToward(ball.holder.x, ball.holder.y);
+            let offensivePlayer = players.find(pl => pl.team === "home" && pl.matchupIndex === p.matchupIndex);
+
+            if (offensivePlayer.hasBall) {
+                // Tight defense on ball
+                p.moveToward(offensivePlayer.x, offensivePlayer.y, 1.5);
+
+                // AI steal chance
+                if (distance(p, offensivePlayer) < 20 && Math.random() < 0.02) {
+                    offensivePlayer.hasBall = false;
+                    p.hasBall = true;
+                    ball.holder = p;
+                }
+
+            } else {
+                // Guard matchup
+                p.moveToward(offensivePlayer.x + 20, offensivePlayer.y);
+            }
         }
-        p.draw();
     });
+}
+
+function update() {
+    drawCourt();
+    updateDefense();
+
+    players.forEach(p => p.draw());
 
     if (ball.holder) {
         ball.x = ball.holder.x;
@@ -162,8 +192,9 @@ canvas.addEventListener("touchmove", function(e){
 });
 
 document.getElementById("pass").ontouchstart = function() {
-    let teammates = players.filter(p => p.team === "home");
+    let teammates = players.filter(p => p.team === "home" && p !== userPlayer);
     let next = teammates[Math.floor(Math.random()*teammates.length)];
+
     userPlayer.hasBall = false;
     next.hasBall = true;
     userPlayer = next;
@@ -171,18 +202,28 @@ document.getElementById("pass").ontouchstart = function() {
 };
 
 document.getElementById("shoot").ontouchstart = function() {
-    score += 2;
+    if (userPlayer.x > canvas.width - 120) {
+        score += 2;
+        resetPositions();
+    }
 };
 
 document.getElementById("steal").ontouchstart = function() {
     players.forEach(p => {
         if (p.team === "away" && p.hasBall) {
-            p.hasBall = false;
-            userPlayer.hasBall = true;
-            ball.holder = userPlayer;
+            if (distance(p, userPlayer) < 25) {
+                p.hasBall = false;
+                userPlayer.hasBall = true;
+                ball.holder = userPlayer;
+            }
         }
     });
 };
+
+function resetPositions() {
+    players = [];
+    createTeams();
+}
 
 createTeams();
 update();
