@@ -1,45 +1,23 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Retro Hoops</title>
+
 <style>
-body {
+html, body {
     margin: 0;
-    background: #111;
+    padding: 0;
     overflow: hidden;
-    touch-action: none;
+    background: #111;
 }
 
 canvas {
-    background: #d68b30;
     display: block;
 }
-
-#controls {
-    position: fixed;
-    bottom: 20px;
-    width: 100%;
-    display: flex;
-    justify-content: space-between;
-    padding: 0 20px;
-}
-
-.btn {
-    width: 70px;
-    height: 70px;
-    background: white;
-    border-radius: 50%;
-    font-size: 16px;
-    text-align: center;
-    line-height: 70px;
-    user-select: none;
-}
-
-#shoot { background: red; color: white; }
-#pass { background: blue; color: white; }
-#steal { background: green; color: white; }
 </style>
+</head>
 </head>
 <body>
 
@@ -57,8 +35,17 @@ canvas {
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
+function resizeGame() {
+    if (window.innerWidth < window.innerHeight) {
+        canvas.width = window.innerHeight;
+        canvas.height = window.innerWidth;
+    } else {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+    }
+}
+resizeGame();
+window.addEventListener("resize", resizeGame);
 
 let players = [];
 let userPlayer = null;
