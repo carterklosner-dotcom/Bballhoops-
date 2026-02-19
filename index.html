@@ -12,23 +12,28 @@ html, body {
     background: #d68b30;
 }
 
-#gameContainer {
-    position: relative;
-    width: 100vw;
-    height: 100vh;
+#rotateMessage {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    background: #111;
+    color: white;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 24px;
+    z-index: 10;
 }
 
 canvas {
-    width: 100vw;
-    height: 100vh;
-    display: block;
+    display: none;
 }
 
 #controls {
-    position: absolute;
+    position: fixed;
     bottom: 20px;
     width: 100%;
-    display: flex;
+    display: none;
     justify-content: space-between;
     padding: 0 30px;
 }
@@ -50,34 +55,49 @@ canvas {
 </head>
 <body>
 
-<div id="gameContainer">
-    <canvas id="game"></canvas>
+<div id="rotateMessage">Rotate Phone To Landscape</div>
 
-    <div id="controls">
-        <div id="steal" class="btn">STEAL</div>
-        <div style="display:flex; gap:20px;">
-            <div id="pass" class="btn">PASS</div>
-            <div id="shoot" class="btn">SHOOT</div>
-        </div>
+<canvas id="game"></canvas>
+
+<div id="controls">
+    <div id="steal" class="btn">STEAL</div>
+    <div style="display:flex; gap:20px;">
+        <div id="pass" class="btn">PASS</div>
+        <div id="shoot" class="btn">SHOOT</div>
     </div>
 </div>
 
-    <script>
+<script>
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
-
-        function resizeCanvas() {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-}
-
-resizeCanvas();
-window.addEventListener("resize", resizeCanvas);
+const rotateMessage = document.getElementById("rotateMessage");
+const controls = document.getElementById("controls");
 
 let players = [];
 let userPlayer = null;
 let ball = { x: 0, y: 0, holder: null };
 let score = 0;
+
+function checkOrientation() {
+    if (window.innerWidth > window.innerHeight) {
+        rotateMessage.style.display = "none";
+        canvas.style.display = "block";
+        controls.style.display = "flex";
+        resizeCanvas();
+    } else {
+        rotateMessage.style.display = "flex";
+        canvas.style.display = "none";
+        controls.style.display = "none";
+    }
+}
+
+function resizeCanvas() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+}
+
+window.addEventListener("resize", checkOrientation);
+checkOrientation();
 
 class Player {
     constructor(x, y, team, matchupIndex) {
@@ -101,7 +121,6 @@ class Player {
         let dx = tx - this.x;
         let dy = ty - this.y;
         let dist = Math.sqrt(dx*dx + dy*dy);
-
         if (dist > 1) {
             this.x += dx / dist * this.speed * speedMultiplier;
             this.y += dy / dist * this.speed * speedMultiplier;
@@ -110,14 +129,37 @@ class Player {
 }
 
 function createTeams() {
+    players = [];
     for (let i = 0; i < 5; i++) {
         players.push(new Player(150, 100 + i*70, "home", i));
-        players.push(new Player(750, 100 + i*70, "away", i));
+        players.push(new Player(canvas.width - 150, 100 + i*70, "away", i));
     }
-
     userPlayer = players[0];
     userPlayer.hasBall = true;
     ball.holder = userPlayer;
+}
+
+function distance(a, b) {
+    return Math.sqrt((a.x - b.x)**2 + (a.y - b.y)**2);
+}
+
+function updateDefense() {
+    players.forEach(p => {
+        if (p.team === "away") {
+            let offensive = players.find(pl => pl.team === "home" && pl.matchupIndex === p.matchupIndex);
+
+            if (offensive.hasBall) {
+                p.moveToward(offensive.x, offensive.y, 1.5);
+                if (distance(p, offensive) < 20 && Math.random() < 0.02) {
+                    offensive.hasBall = false;
+                    p.hasBall = true;
+                    ball.holder = p;
+                }
+            } else {
+                p.moveToward(offensive.x + 20, offensive.y);
+            }
+        }
+    });
 }
 
 function drawCourt() {
@@ -132,35 +174,9 @@ function drawCourt() {
     ctx.stroke();
 }
 
-function distance(a, b) {
-    return Math.sqrt((a.x - b.x)**2 + (a.y - b.y)**2);
-}
-
-function updateDefense() {
-    players.forEach(p => {
-        if (p.team === "away") {
-            let offensivePlayer = players.find(pl => pl.team === "home" && pl.matchupIndex === p.matchupIndex);
-
-            if (offensivePlayer.hasBall) {
-                // Tight defense on ball
-                p.moveToward(offensivePlayer.x, offensivePlayer.y, 1.5);
-
-                // AI steal chance
-                if (distance(p, offensivePlayer) < 20 && Math.random() < 0.02) {
-                    offensivePlayer.hasBall = false;
-                    p.hasBall = true;
-                    ball.holder = p;
-                }
-
-            } else {
-                // Guard matchup
-                p.moveToward(offensivePlayer.x + 20, offensivePlayer.y);
-            }
-        }
-    });
-}
-
 function update() {
+    if (window.innerWidth <= window.innerHeight) return;
+
     drawCourt();
     updateDefense();
 
@@ -186,15 +202,12 @@ function update() {
 canvas.addEventListener("touchmove", function(e){
     let rect = canvas.getBoundingClientRect();
     let touch = e.touches[0];
-    let x = touch.clientX - rect.left;
-    let y = touch.clientY - rect.top;
-    userPlayer.moveToward(x, y);
+    userPlayer.moveToward(touch.clientX - rect.left, touch.clientY - rect.top);
 });
 
 document.getElementById("pass").ontouchstart = function() {
     let teammates = players.filter(p => p.team === "home" && p !== userPlayer);
     let next = teammates[Math.floor(Math.random()*teammates.length)];
-
     userPlayer.hasBall = false;
     next.hasBall = true;
     userPlayer = next;
@@ -204,26 +217,19 @@ document.getElementById("pass").ontouchstart = function() {
 document.getElementById("shoot").ontouchstart = function() {
     if (userPlayer.x > canvas.width - 120) {
         score += 2;
-        resetPositions();
+        createTeams();
     }
 };
 
 document.getElementById("steal").ontouchstart = function() {
     players.forEach(p => {
-        if (p.team === "away" && p.hasBall) {
-            if (distance(p, userPlayer) < 25) {
-                p.hasBall = false;
-                userPlayer.hasBall = true;
-                ball.holder = userPlayer;
-            }
+        if (p.team === "away" && p.hasBall && distance(p, userPlayer) < 25) {
+            p.hasBall = false;
+            userPlayer.hasBall = true;
+            ball.holder = userPlayer;
         }
     });
 };
-
-function resetPositions() {
-    players = [];
-    createTeams();
-}
 
 createTeams();
 update();
