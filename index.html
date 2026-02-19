@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Retro Hoops Shot Meter</title>
+<title>Retro Hoops with Basket</title>
 <style>
 html, body {
     margin: 0;
@@ -15,7 +15,7 @@ html, body {
 #gameContainer {
     position: relative;
     width: 100vw;
-    height: 90vh; 
+    height: 90vh;
     margin: 0 auto;
     background: #d68b30;
 }
@@ -74,17 +74,28 @@ let ball = {x:0, y:0, holder:null};
 let score = 0;
 let offense = true;
 
+// Basket
+const hoop = {
+    x: canvas.width - 40,
+    y: canvas.height/2,
+    radius: 15
+};
+
 // Shot meter variables
 let shooting = false;
 let meterX = 0;
 let meterSpeed = 3;
 let shotLineStopped = false;
 
-// Meter style
+// Shot animation
+let shootingBall = false;
+let shotTarget = {x: hoop.x, y: hoop.y};
+let shotProgress = 0;
+
 const meter = {
     width: 150,
     height: 15,
-    greenStart: 60, // pixels from left of meter
+    greenStart: 60,
     greenEnd: 90
 };
 
@@ -161,28 +172,30 @@ function drawCourt(){
     ctx.moveTo(canvas.width/2,0);
     ctx.lineTo(canvas.width/2,canvas.height);
     ctx.stroke();
+
+    // Draw hoop
+    ctx.beginPath();
+    ctx.strokeStyle="orange";
+    ctx.lineWidth=3;
+    ctx.arc(hoop.x, hoop.y, hoop.radius, 0, Math.PI*2);
+    ctx.stroke();
 }
 
-// Draw the shot meter
 function drawShotMeter(){
     if(!shooting) return;
 
     const meterXPos = canvas.width/2 - meter.width/2;
     const meterYPos = canvas.height - 50;
 
-    // Draw red background
     ctx.fillStyle="red";
     ctx.fillRect(meterXPos, meterYPos, meter.width, meter.height);
 
-    // Draw green center zone
     ctx.fillStyle="green";
     ctx.fillRect(meterXPos + meter.greenStart, meterYPos, meter.greenEnd - meter.greenStart, meter.height);
 
-    // Draw moving white line
     ctx.fillStyle="white";
     ctx.fillRect(meterXPos + meterX, meterYPos, 2, meter.height);
 
-    // Move the line if not stopped
     if(!shotLineStopped){
         meterX += meterSpeed;
         if(meterX > meter.width || meterX < 0){
@@ -195,17 +208,32 @@ function update(){
     drawCourt();
     updateDefense();
     players.forEach(p=>p.draw());
-    if(ball.holder){ball.x=ball.holder.x; ball.y=ball.holder.y;}
+
+    // Handle ball
+    if(shootingBall){
+        shotProgress += 0.05;
+        ball.x = userPlayer.x + (shotTarget.x - userPlayer.x) * shotProgress;
+        ball.y = userPlayer.y + (shotTarget.y - userPlayer.y) * shotProgress - 50*Math.sin(Math.PI*shotProgress);
+        if(shotProgress >= 1){
+            shootingBall=false;
+            ball.holder=null;
+            createTeams();
+        }
+    } else if(ball.holder){
+        ball.x=ball.holder.x;
+        ball.y=ball.holder.y;
+    }
+
     ctx.beginPath();
     ctx.fillStyle="orange";
     ctx.arc(ball.x, ball.y,6,0,Math.PI*2);
     ctx.fill();
+
     ctx.fillStyle="white";
     ctx.font="18px Arial";
     ctx.fillText("Score: "+score,20,25);
 
     drawShotMeter();
-
     requestAnimationFrame(update);
 }
 
@@ -227,7 +255,6 @@ function updateButtons(){
     }
 }
 
-// Action1: PASS / STEAL
 action1Btn.ontouchstart = function(){
     if(offense){
         let teammates = players.filter(p=>p.team==="home" && p!==userPlayer);
@@ -237,7 +264,6 @@ action1Btn.ontouchstart = function(){
         userPlayer=next;
         ball.holder=userPlayer;
     } else {
-        // STEAL
         players.forEach(p=>{
             if(p.team==="away" && p.hasBall && distance(p,userPlayer)<25){
                 p.hasBall=false;
@@ -250,7 +276,6 @@ action1Btn.ontouchstart = function(){
     }
 };
 
-// Action2: SHOOT / BLOCK
 action2Btn.ontouchstart = function(){
     if(offense){
         if(!shooting){
@@ -259,24 +284,23 @@ action2Btn.ontouchstart = function(){
             meterX=0;
         } else {
             shotLineStopped=true;
-            // Calculate chance
-            const meterPos = meterX;
-            const meterXPos = canvas.width/2 - meter.width/2;
-            const linePos = meterPos; // relative to meter start
+            const linePos = meterX;
             let success=0;
             if(linePos >= meter.greenStart && linePos <= meter.greenEnd){
-                success = 90; // perfect green zone
+                success = 90;
             } else {
                 let dist = Math.min(Math.abs(linePos - meter.greenStart), Math.abs(linePos - meter.greenEnd));
-                success = Math.max(10, 90 - dist*2); // closer to green = higher
+                success = Math.max(10, 90 - dist*2);
             }
-            if(Math.random()*100 < success && userPlayer.x > canvas.width*0.85){
+            if(success > Math.random()*100){
                 score+=2;
             }
             shooting=false;
+            shotLineStopped=false;
+            shootingBall=true;
+            shotProgress=0;
         }
     } else {
-        // BLOCK
         players.forEach(p=>{
             if(p.team==="away" && p.hasBall && distance(p,userPlayer)<25){
                 p.hasBall=false;
