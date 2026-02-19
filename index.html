@@ -7,48 +7,54 @@
 html, body {
     margin: 0;
     padding: 0;
-    overflow: hidden;
+    overflow: hidden; /* prevents scrolling */
     background: #d68b30;
     touch-action: none;
 }
 
+#gameContainer {
+    position: relative;
+    width: 100vw;
+    height: 90vh; /* smaller court to avoid scroll */
+    margin: 0 auto;
+    background: #d68b30;
+}
+
 canvas {
-    position: absolute;
-    top: 0;
-    left: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
 }
 
 #controls {
     position: absolute;
-    bottom: 15px;
+    bottom: 10px;
     width: 100%;
     display: flex;
-    justify-content: space-between;
-    padding: 0 20px;
-    gap: 15px;
+    justify-content: space-around;
 }
 
 .btn {
-    width: 90px;
+    width: 80px;
     height: 40px;
+    background: black;
+    color: white;
     border-radius: 5px;
     text-align: center;
     line-height: 40px;
     font-weight: bold;
-    color: white;
-    font-size: 16px;
-    background: black;
+    font-size: 14px;
     user-select: none;
 }
 
 /* Shot meter bar */
 #shotMeterContainer {
     position: absolute;
-    bottom: 70px;
+    bottom: 60px;
     left: 50%;
     transform: translateX(-50%);
     width: 150px;
-    height: 20px;
+    height: 15px;
     background: #333;
     border: 2px solid white;
     display: none;
@@ -63,74 +69,69 @@ canvas {
 </head>
 <body>
 
-<canvas id="game"></canvas>
-
-<div id="controls">
-    <div id="steal" class="btn">STEAL</div>
-    <div id="pass" class="btn">PASS</div>
-    <div id="shoot" class="btn">SHOOT</div>
-</div>
-
-<div id="shotMeterContainer">
-    <div id="shotMeter"></div>
+<div id="gameContainer">
+    <canvas id="game"></canvas>
+    <div id="controls">
+        <div id="steal" class="btn">STEAL</div>
+        <div id="pass" class="btn">PASS</div>
+        <div id="shoot" class="btn">SHOOT</div>
+    </div>
+    <div id="shotMeterContainer">
+        <div id="shotMeter"></div>
+    </div>
 </div>
 
 <script>
+const container = document.getElementById("gameContainer");
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 const shotMeterContainer = document.getElementById("shotMeterContainer");
 const shotMeter = document.getElementById("shotMeter");
 
-function resizeCanvas() {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-}
-resizeCanvas();
-window.addEventListener("resize", resizeCanvas);
+canvas.width = container.clientWidth;
+canvas.height = container.clientHeight;
 
 let players = [];
 let userPlayer = null;
-let ball = { x: 0, y: 0, holder: null };
+let ball = {x:0, y:0, holder:null};
 let score = 0;
 
-// Shot meter variables
+// Shot meter
 let shooting = false;
 let meterValue = 0;
-let meterDirection = 1; // 1 = increasing, -1 = decreasing
+let meterDirection = 1;
 
 class Player {
-    constructor(x, y, team, matchupIndex) {
-        this.x = x;
-        this.y = y;
-        this.team = team;
-        this.radius = 12;
-        this.hasBall = false;
-        this.matchupIndex = matchupIndex;
-        this.speed = 3;
+    constructor(x, y, team, matchupIndex){
+        this.x=x; this.y=y; this.team=team;
+        this.radius=12;
+        this.hasBall=false;
+        this.matchupIndex=matchupIndex;
+        this.speed=3;
     }
 
-    draw() {
+    draw(){
         ctx.beginPath();
-        ctx.fillStyle = this.team === "home" ? "white" : "black";
+        ctx.fillStyle = this.team==="home" ? "white" : "black";
         ctx.arc(this.x, this.y, this.radius, 0, Math.PI*2);
         ctx.fill();
     }
 
-    moveToward(tx, ty, multiplier=1) {
-        let dx = tx - this.x;
-        let dy = ty - this.y;
-        let dist = Math.sqrt(dx*dx + dy*dy);
-        if (dist > 1) {
-            this.x += dx / dist * this.speed * multiplier;
-            this.y += dy / dist * this.speed * multiplier;
+    moveToward(tx, ty, multiplier=1){
+        let dx=tx-this.x;
+        let dy=ty-this.y;
+        let dist=Math.sqrt(dx*dx+dy*dy);
+        if(dist>1){
+            this.x += dx/dist * this.speed * multiplier;
+            this.y += dy/dist * this.speed * multiplier;
         }
     }
 }
 
-function createTeams() {
-    players = [];
-    let spacing = canvas.height / 6;
-    for (let i = 0; i < 5; i++) {
+function createTeams(){
+    players=[];
+    let spacing = canvas.height/6;
+    for(let i=0;i<5;i++){
         players.push(new Player(canvas.width*0.2, spacing*(i+1), "home", i));
         players.push(new Player(canvas.width*0.8, spacing*(i+1), "away", i));
     }
@@ -139,14 +140,12 @@ function createTeams() {
     ball.holder = userPlayer;
 }
 
-function distance(a,b) {
-    return Math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2);
-}
+function distance(a,b){return Math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2);}
 
-function updateDefense() {
+function updateDefense(){
     players.forEach(p=>{
         if(p.team==="away"){
-            let offensive = players.find(pl=>pl.team==="home" && pl.matchupIndex===p.matchupIndex);
+            let offensive=players.find(pl=>pl.team==="home" && pl.matchupIndex===p.matchupIndex);
             if(offensive.hasBall){
                 p.moveToward(offensive.x, offensive.y, 1.5);
                 if(distance(p, offensive)<20 && Math.random()<0.02){
@@ -172,7 +171,7 @@ function drawCourt(){
     ctx.stroke();
 }
 
-function updateShotMeter() {
+function updateShotMeter(){
     if(!shooting) return;
     meterValue += meterDirection*2;
     if(meterValue>=100){ meterValue=100; meterDirection=-1;}
@@ -184,34 +183,26 @@ function update(){
     drawCourt();
     updateDefense();
     updateShotMeter();
-
     players.forEach(p=>p.draw());
-
-    if(ball.holder){
-        ball.x = ball.holder.x;
-        ball.y = ball.holder.y;
-    }
-
+    if(ball.holder){ball.x=ball.holder.x; ball.y=ball.holder.y;}
     ctx.beginPath();
     ctx.fillStyle="orange";
     ctx.arc(ball.x, ball.y,6,0,Math.PI*2);
     ctx.fill();
-
     ctx.fillStyle="white";
-    ctx.font="20px Arial";
-    ctx.fillText("Score: "+score,20,30);
-
+    ctx.font="18px Arial";
+    ctx.fillText("Score: "+score,20,25);
     requestAnimationFrame(update);
 }
 
-canvas.addEventListener("touchmove",function(e){
-    let rect=canvas.getBoundingClientRect();
-    let touch=e.touches[0];
-    userPlayer.moveToward(touch.clientX-rect.left,touch.clientY-rect.top);
+canvas.addEventListener("touchmove", function(e){
+    let rect = canvas.getBoundingClientRect();
+    let touch = e.touches[0];
+    userPlayer.moveToward(touch.clientX-rect.left, touch.clientY-rect.top);
 });
 
 // Buttons
-document.getElementById("pass").ontouchstart=function(){
+document.getElementById("pass").ontouchstart = function(){
     let teammates = players.filter(p=>p.team==="home" && p!==userPlayer);
     let next = teammates[Math.floor(Math.random()*teammates.length)];
     userPlayer.hasBall=false;
@@ -220,7 +211,7 @@ document.getElementById("pass").ontouchstart=function(){
     ball.holder=userPlayer;
 };
 
-document.getElementById("steal").ontouchstart=function(){
+document.getElementById("steal").ontouchstart = function(){
     players.forEach(p=>{
         if(p.team==="away" && p.hasBall && distance(p,userPlayer)<25){
             p.hasBall=false;
@@ -230,15 +221,13 @@ document.getElementById("steal").ontouchstart=function(){
     });
 };
 
-// Shoot with shot meter
-document.getElementById("shoot").ontouchstart=function(){
+document.getElementById("shoot").ontouchstart = function(){
     if(!shooting){
         shooting=true;
         shotMeterContainer.style.display="block";
     } else {
         shooting=false;
         shotMeterContainer.style.display="none";
-        // Calculate shot success: higher meterValue = better
         let success = Math.random()*100 < meterValue;
         if(success && userPlayer.x > canvas.width*0.85){
             score+=2;
