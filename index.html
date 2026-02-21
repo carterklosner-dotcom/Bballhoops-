@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Retro Hoops</title>
+<title>Retro Hoops Full Court</title>
 <style>
 html, body {
     margin: 0;
@@ -15,9 +15,7 @@ html, body {
 #gameContainer {
     position: relative;
     width: 100vw;
-    height: 90vh;
-    margin: 0 auto;
-    background: #d68b30;
+    height: 95vh;
 }
 
 canvas {
@@ -26,28 +24,6 @@ canvas {
     display: block;
 }
 
-/* Buttons */
-#controls {
-    position: absolute;
-    bottom: 20px;
-    right: 20px;
-    display: flex;
-    gap: 10px;
-}
-
-.btn {
-    width: 90px;
-    height: 45px;
-    background: black;
-    color: white;
-    border-radius: 6px;
-    text-align: center;
-    line-height: 45px;
-    font-weight: bold;
-    font-size: 16px;
-}
-
-/* Joystick */
 #joystickBase {
     position: absolute;
     bottom: 20px;
@@ -66,6 +42,23 @@ canvas {
     background: rgba(255,255,255,0.8);
     left: 30px;
     top: 30px;
+}
+
+#controls {
+    position: absolute;
+    bottom: 30px;
+    right: 30px;
+}
+
+.btn {
+    width: 90px;
+    height: 45px;
+    background: black;
+    color: white;
+    border-radius: 6px;
+    text-align: center;
+    line-height: 45px;
+    font-weight: bold;
 }
 </style>
 </head>
@@ -93,133 +86,144 @@ const joystickBase = document.getElementById("joystickBase");
 const joystickStick = document.getElementById("joystickStick");
 const shootBtn = document.getElementById("shootBtn");
 
-/* ======================
-   GAME VARIABLES
-====================== */
-
-let player = {x: 120, y: canvas.height/2, radius: 15};
-let ball = {x: player.x, y: player.y};
-let score = 0;
-
 let joystickEnabled = true;
+let score = 0;
+let opponentScore = 0;
 
-/* ======================
-   SHOT METER VARIABLES
-====================== */
+/* ========= HOOPS ========= */
 
-let shooting = false;
-let linePos = 0;
-let lineSpeed = 3;
-let lineMoving = true;
+const rightHoop = { x: canvas.width - 40, y: canvas.height/2, radius: 18 };
+const leftHoop  = { x: 40, y: canvas.height/2, radius: 18 };
 
-const meter = {
-    width: 200,
-    height: 18,
-    greenStart: 80,
-    greenEnd: 120
-};
+/* ========= PLAYER CLASS ========= */
 
-/* ======================
-   SHOT ANIMATION
-====================== */
-
-let shootingBall = false;
-let shotProgress = 0;
-
-const hoop = {
-    x: canvas.width - 50,
-    y: canvas.height/2,
-    radius: 18
-};
-
-/* ======================
-   JOYSTICK LOGIC
-====================== */
-
-let dragging = false;
-const baseRadius = 60;
-const stickRadius = 30;
-
-function resetStick(){
-    joystickStick.style.left = "30px";
-    joystickStick.style.top = "30px";
+function Player(x,y,color){
+    this.x = x;
+    this.y = y;
+    this.color = color;
+    this.radius = 15;
 }
 
-joystickBase.addEventListener("touchstart", e=>{
+/* ========= TEAMS ========= */
+
+let team = [
+    new Player(120, canvas.height/2 - 40, "white"),
+    new Player(180, canvas.height/2 + 40, "white")
+];
+
+let defenders = [
+    new Player(canvas.width-120, canvas.height/2 - 40, "black"),
+    new Player(canvas.width-180, canvas.height/2 + 40, "black")
+];
+
+let user = team[0];
+let ball = {x:user.x, y:user.y};
+
+/* ========= JOYSTICK ========= */
+
+let dragging=false;
+const baseRadius=60;
+const stickRadius=30;
+
+function resetStick(){
+    joystickStick.style.left="30px";
+    joystickStick.style.top="30px";
+}
+
+joystickBase.addEventListener("touchstart", ()=>{
     if(!joystickEnabled) return;
-    dragging = true;
+    dragging=true;
 });
 
 joystickBase.addEventListener("touchmove", e=>{
     if(!dragging || !joystickEnabled) return;
 
-    const rect = joystickBase.getBoundingClientRect();
-    const touch = e.touches[0];
+    const rect=joystickBase.getBoundingClientRect();
+    const t=e.touches[0];
 
-    let dx = touch.clientX - (rect.left + baseRadius);
-    let dy = touch.clientY - (rect.top + baseRadius);
+    let dx=t.clientX-(rect.left+baseRadius);
+    let dy=t.clientY-(rect.top+baseRadius);
+    const dist=Math.sqrt(dx*dx+dy*dy);
 
-    const distance = Math.sqrt(dx*dx + dy*dy);
-
-    if(distance > baseRadius){
-        dx = dx / distance * baseRadius;
-        dy = dy / distance * baseRadius;
+    if(dist>baseRadius){
+        dx=dx/dist*baseRadius;
+        dy=dy/dist*baseRadius;
     }
 
-    joystickStick.style.left = (dx + baseRadius - stickRadius) + "px";
-    joystickStick.style.top = (dy + baseRadius - stickRadius) + "px";
+    joystickStick.style.left=(dx+baseRadius-stickRadius)+"px";
+    joystickStick.style.top=(dy+baseRadius-stickRadius)+"px";
 
-    player.x += dx * 0.05;
-    player.y += dy * 0.05;
+    user.x+=dx*0.06;
+    user.y+=dy*0.06;
 });
 
-joystickBase.addEventListener("touchend", e=>{
-    dragging = false;
+joystickBase.addEventListener("touchend", ()=>{
+    dragging=false;
     resetStick();
 });
 
-/* ======================
-   SHOOT BUTTON
-====================== */
+/* ========= SHOT METER ========= */
 
-shootBtn.ontouchstart = function(){
+let shooting=false;
+let linePos=0;
+let lineSpeed=3;
+let lineMoving=true;
+let shootingBall=false;
+let shotProgress=0;
 
+const meter={
+    width:200,
+    height:18,
+    greenStart:80,
+    greenEnd:120
+};
+
+shootBtn.ontouchstart=function(){
     if(!shooting){
-        // START shooting
-        shooting = true;
-        joystickEnabled = false; // DISABLE joystick
-        lineMoving = true;
-        linePos = 0;
-    }
-    else{
-        // STOP timing
-        lineMoving = false;
+        shooting=true;
+        joystickEnabled=false;
+        linePos=0;
+        lineMoving=true;
+    }else{
+        lineMoving=false;
 
-        let chance = 0;
-
-        if(linePos >= meter.greenStart && linePos <= meter.greenEnd){
-            chance = 90;
-        } else {
-            let dist = Math.min(
-                Math.abs(linePos - meter.greenStart),
-                Math.abs(linePos - meter.greenEnd)
+        let chance=0;
+        if(linePos>=meter.greenStart && linePos<=meter.greenEnd){
+            chance=90;
+        }else{
+            let d=Math.min(
+                Math.abs(linePos-meter.greenStart),
+                Math.abs(linePos-meter.greenEnd)
             );
-            chance = Math.max(10, 90 - dist*2);
+            chance=Math.max(10,90-d*2);
         }
 
-        if(Math.random()*100 < chance){
-            score += 2;
+        if(Math.random()*100<chance){
+            score+=2;
         }
 
-        shooting = false;
-        shootingBall = true;
-        shotProgress = 0;
+        shooting=false;
+        shootingBall=true;
+        shotProgress=0;
     }
 };
 
-/* ======================
-   DRAW FUNCTIONS
-====================== */
+/* ========= DEFENSE AI ========= */
+
+function updateDefense(){
+    defenders.forEach((d,i)=>{
+        let target=team[i];
+        let dx=target.x-d.x;
+        let dy=target.y-d.y;
+        let dist=Math.sqrt(dx*dx+dy*dy);
+        if(dist>1){
+            d.x+=dx/dist*1.5;
+            d.y+=dy/dist*1.5;
+        }
+    });
+}
+
+/* ========= DRAW COURT ========= */
 
 function drawCourt(){
     ctx.fillStyle="#d68b30";
@@ -227,86 +231,90 @@ function drawCourt(){
 
     ctx.strokeStyle="white";
     ctx.lineWidth=3;
+
+    // mid line
     ctx.beginPath();
     ctx.moveTo(canvas.width/2,0);
     ctx.lineTo(canvas.width/2,canvas.height);
     ctx.stroke();
 
+    // center circle
     ctx.beginPath();
+    ctx.arc(canvas.width/2,canvas.height/2,60,0,Math.PI*2);
+    ctx.stroke();
+
+    // hoops
     ctx.strokeStyle="orange";
-    ctx.arc(hoop.x, hoop.y, hoop.radius, 0, Math.PI*2);
+    ctx.beginPath();
+    ctx.arc(rightHoop.x,rightHoop.y,rightHoop.radius,0,Math.PI*2);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(leftHoop.x,leftHoop.y,leftHoop.radius,0,Math.PI*2);
     ctx.stroke();
 }
 
-function drawShotMeter(){
-    if(!shooting) return;
-
-    const meterXPos = canvas.width/2 - meter.width/2;
-    const meterYPos = 40; // TOP of screen
-
-    ctx.fillStyle="red";
-    ctx.fillRect(meterXPos, meterYPos, meter.width, meter.height);
-
-    ctx.fillStyle="green";
-    ctx.fillRect(
-        meterXPos + meter.greenStart,
-        meterYPos,
-        meter.greenEnd - meter.greenStart,
-        meter.height
-    );
-
-    ctx.fillStyle="white";
-    ctx.fillRect(meterXPos + linePos, meterYPos, 3, meter.height);
-
-    if(lineMoving){
-        linePos += lineSpeed;
-        if(linePos > meter.width || linePos < 0){
-            lineSpeed *= -1;
-        }
-    }
-}
-
-/* ======================
-   GAME LOOP
-====================== */
+/* ========= GAME LOOP ========= */
 
 function update(){
-
     drawCourt();
+    updateDefense();
 
     if(shootingBall){
-        shotProgress += 0.05;
+        shotProgress+=0.05;
+        ball.x=user.x+(rightHoop.x-user.x)*shotProgress;
+        ball.y=user.y+(rightHoop.y-user.y)*shotProgress
+                -60*Math.sin(Math.PI*shotProgress);
 
-        ball.x = player.x + (hoop.x - player.x) * shotProgress;
-        ball.y = player.y + (hoop.y - player.y) * shotProgress
-                 - 60 * Math.sin(Math.PI * shotProgress);
-
-        if(shotProgress >= 1){
-            shootingBall = false;
-            joystickEnabled = true; // RE-ENABLE joystick
-            player.x = 120;
-            player.y = canvas.height/2;
+        if(shotProgress>=1){
+            shootingBall=false;
+            joystickEnabled=true;
+            user.x=120;
+            user.y=canvas.height/2-40;
         }
-    } else {
-        ball.x = player.x;
-        ball.y = player.y;
+    }else{
+        ball.x=user.x;
+        ball.y=user.y;
     }
 
-    ctx.beginPath();
-    ctx.fillStyle="white";
-    ctx.arc(player.x, player.y, player.radius, 0, Math.PI*2);
-    ctx.fill();
+    [...team,...defenders].forEach(p=>{
+        ctx.beginPath();
+        ctx.fillStyle=p.color;
+        ctx.arc(p.x,p.y,p.radius,0,Math.PI*2);
+        ctx.fill();
+    });
 
     ctx.beginPath();
     ctx.fillStyle="orange";
-    ctx.arc(ball.x, ball.y, 6, 0, Math.PI*2);
+    ctx.arc(ball.x,ball.y,6,0,Math.PI*2);
     ctx.fill();
 
     ctx.fillStyle="white";
     ctx.font="20px Arial";
-    ctx.fillText("Score: " + score, 20, 30);
+    ctx.fillText("You: "+score,20,30);
+    ctx.fillText("CPU: "+opponentScore,20,55);
 
-    drawShotMeter();
+    if(shooting){
+        const x=canvas.width/2-meter.width/2;
+        const y=40;
+
+        ctx.fillStyle="red";
+        ctx.fillRect(x,y,meter.width,meter.height);
+
+        ctx.fillStyle="green";
+        ctx.fillRect(x+meter.greenStart,y,
+            meter.greenEnd-meter.greenStart,meter.height);
+
+        ctx.fillStyle="white";
+        ctx.fillRect(x+linePos,y,3,meter.height);
+
+        if(lineMoving){
+            linePos+=lineSpeed;
+            if(linePos>meter.width || linePos<0){
+                lineSpeed*=-1;
+            }
+        }
+    }
 
     requestAnimationFrame(update);
 }
