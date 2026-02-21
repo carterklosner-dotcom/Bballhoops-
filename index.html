@@ -178,7 +178,40 @@ const meter={
     greenEnd:120
 };
 
-shootBtn.ontouchstart=function(){
+shootBtn.addEventListener("touchstart", function(e){
+    e.preventDefault();
+
+    if(!shooting){
+        // START shot meter
+        shooting = true;
+        joystickEnabled = false;
+        linePos = 0;
+        lineMoving = true;
+    } else {
+        // STOP timing
+        lineMoving = false;
+
+        let chance = 0;
+
+        if(linePos >= meter.greenStart && linePos <= meter.greenEnd){
+            chance = 90;
+        } else {
+            let d = Math.min(
+                Math.abs(linePos - meter.greenStart),
+                Math.abs(linePos - meter.greenEnd)
+            );
+            chance = Math.max(10, 90 - d * 2);
+        }
+
+        if(Math.random() * 100 < chance){
+            score += 2;
+        }
+
+        shooting = false;
+        shootingBall = true;
+        shotProgress = 0;
+    }
+});
     if(!shooting){
         shooting=true;
         joystickEnabled=false;
